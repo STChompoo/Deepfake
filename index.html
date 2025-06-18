@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Deepfake Detector</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Upload an Image for Deepfake Detection</h1>
+        <input type="file" id="fileInput" />
+        <button onclick="upload()">Analyze</button>
+        <p id="result"></p>
+    </div>
+
+    <script>
+        async function upload() {
+            const input = document.getElementById('fileInput');
+            const result = document.getElementById('result');
+            result.textContent = "⏳ Processing...";
+
+            if (!input.files.length) {
+                result.textContent = "⚠️ Please choose a file to upload.";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+
+            try {
+                const res = await fetch("/predict", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await res.json();
+                result.textContent = `✅ Result: ${data.label} (Confidence: ${data.confidence})`;
+
+            } catch (err) {
+                result.textContent = "❌ Error occurred during prediction.";
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>
