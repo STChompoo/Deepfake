@@ -1,46 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Deepfake Detector</title>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <title>Deepfake Detector</title>
+
+  <!-- ✅ Load Nunito font -->
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background-color: #1a1f2b;
+      color: #e0e6ed;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px;
+      margin: 0;
+      background-image: radial-gradient(circle at top left, #2c2f40, #1a1f2b);
+    }
+
+    h2 {
+      color: #72c6ff;
+      margin-bottom: 30px;
+      text-shadow: 0 0 10px #72c6ffaa;
+    }
+
+    h3, h4 {
+      color: #dbeafe;
+    }
+
+    form, .result-box {
+      background-color: #232b3a;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+      margin-top: 20px;
+      width: 100%;
+      max-width: 550px;
+      text-align: center;
+      transition: box-shadow 0.4s ease;
+    }
+
+    form:hover, .result-box:hover {
+      box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+    }
+
+    input[type="file"] {
+      font-size: 16px;
+      margin: 15px 0;
+      padding: 12px;
+      color: #e2e8f0;
+      background-color: #2e3748;
+      border: 1px solid #4b5563;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+    }
+
+    input[type="file"]:hover {
+      border-color: #7dd3fc;
+      box-shadow: 0 0 8px #0ea5e9;
+    }
+
+    #analyze-btn {
+      background-color: #0ea5e9;
+      color: white;
+      padding: 12px 26px;
+      border: none;
+      font-size: 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 15px;
+      display: none;
+      box-shadow: 0 0 12px rgba(14, 165, 233, 0.6);
+      transition: background-color 0.4s ease, box-shadow 0.4s ease, transform 0.2s ease;
+    }
+
+    #analyze-btn:hover {
+      background-color: #38bdf8;
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.9);
+      transform: scale(1.05);
+    }
+
+    img {
+      margin-top: 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      max-width: 100%;
+    }
+
+    select {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #64748b;
+      background-color: #2e3748;
+      color: #e2e8f0;
+      margin-left: 8px;
+      transition: all 0.3s ease;
+    }
+
+    select:hover {
+      border-color: #7dd3fc;
+      box-shadow: 0 0 6px #0ea5e9;
+    }
+
+    button {
+      background-color: #8b5cf6;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      font-size: 15px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 12px;
+      box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+      transition: all 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #a78bfa;
+      box-shadow: 0 0 18px rgba(168, 139, 250, 0.8);
+      transform: scale(1.05);
+    }
+
+    .confidence {
+      margin-top: 15px;
+      font-size: 16px;
+      color: #cbd5e1;
+    }
+
+    #feedback-form {
+      margin-top: 20px;
+    }
+
+    #feedback-result {
+      margin-top: 15px;
+      font-weight: bold;
+      text-shadow: 0 0 6px #38bdf8;
+    }
+
+    #preview-container {
+      display: none;
+    }
+
+    label {
+      font-size: 15px;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Upload an Image for Deepfake Detection</h1>
-        <input type="file" id="fileInput" />
-        <button onclick="upload()">Analyze</button>
-        <p id="result"></p>
+
+  <h2>🤖 Deepfake Image Analyzer</h2>
+
+  <form id="uploadForm" action="/predict" method="post" enctype="multipart/form-data">
+    <input type="file" name="image" accept="image/*" onchange="previewImage(event)" required>
+    <div id="preview-container">
+      <h3>Image Preview:</h3>
+      <img id="preview" src="#" width="300">
+      <br>
+      <button type="submit" id="analyze-btn">Analyze</button>
+    </div>
+  </form>
+
+  {% if result %}
+  <div class="result-box">
+    <h3>Prediction: {{ result }}</h3>
+    <img src="{{ image_path }}" width="300">
+    <div class="confidence">
+      Confidence:<br>
+      Fake: {{ fake_prob }}%<br>
+      Real: {{ real_prob }}%
     </div>
 
-    <script>
-        async function upload() {
-            const input = document.getElementById('fileInput');
-            const result = document.getElementById('result');
-            result.textContent = "⏳ Processing...";
+    <form id="feedback-form">
+      <h4 style="margin-top: 25px;">Was this prediction wrong?</h4>
+      <input type="hidden" name="filename" value="{{ filename }}">
+      <label>
+        Correct label:
+        <select name="correct_label" required>
+          <option value="fake">Fake</option>
+          <option value="real">Real</option>
+        </select>
+      </label>
+      <br>
+      <button type="submit">Submit Feedback</button>
+    </form>
+    <div id="feedback-result"></div>
+  </div>
+  {% endif %}
 
-            if (!input.files.length) {
-                result.textContent = "⚠️ Please choose a file to upload.";
-                return;
-            }
+  <script>
+    function previewImage(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const preview = document.getElementById("preview");
+          const container = document.getElementById("preview-container");
+          const btn = document.getElementById("analyze-btn");
+          preview.src = e.target.result;
+          container.style.display = "block";
+          btn.style.display = "inline-block";
+        };
+        reader.readAsDataURL(file);
+      }
+    }
 
-            const formData = new FormData();
-            formData.append("file", input.files[0]);
+    document.addEventListener("DOMContentLoaded", function () {
+      const feedbackForm = document.getElementById("feedback-form");
+      if (feedbackForm) {
+        feedbackForm.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const formData = new FormData(feedbackForm);
 
-            try {
-                const res = await fetch("/predict", {
-                    method: "POST",
-                    body: formData
-                });
+          const response = await fetch("/submit_feedback", {
+            method: "POST",
+            body: formData
+          });
 
-                const data = await res.json();
-                result.textContent = `✅ Result: ${data.label} (Confidence: ${data.confidence})`;
+          const result = await response.json();
+          const resultBox = document.getElementById("feedback-result");
 
-            } catch (err) {
-                result.textContent = "❌ Error occurred during prediction.";
-                console.error(err);
-            }
-        }
-    </script>
+          if (result.status === "success") {
+            resultBox.textContent = "✅ Feedback submitted successfully.";
+            resultBox.style.color = "#4ade80";
+          } else {
+            resultBox.textContent = "❌ Failed to submit feedback.";
+            resultBox.style.color = "#f87171";
+          }
+        });
+      }
+    });
+  </script>
+
 </body>
 </html>
